@@ -88,6 +88,7 @@ function Header({ darkMode, onThemeToggle }) {
           className="icon-button theme-toggle"
           type="button"
           aria-label={`Switch to ${darkMode ? 'light' : 'dark'} theme`}
+          aria-pressed={darkMode}
           onClick={onThemeToggle}
         >
           {darkMode ? <Sun size={18} /> : <Moon size={18} />}
@@ -253,12 +254,18 @@ function Footer() {
 }
 
 export default function App() {
-  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('tis-theme') === 'dark')
+  const [darkMode, setDarkMode] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return window.localStorage.getItem('tis-theme') === 'dark'
+  })
   const progressRef = useRef(null)
+  const cursorRef = useRef(null)
 
   useEffect(() => {
     document.documentElement.dataset.theme = darkMode ? 'dark' : 'light'
-    localStorage.setItem('tis-theme', darkMode ? 'dark' : 'light')
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('tis-theme', darkMode ? 'dark' : 'light')
+    }
   }, [darkMode])
 
   useEffect(() => {
@@ -283,8 +290,61 @@ export default function App() {
     }
   }, [])
 
+  useEffect(() => {
+    if (!cursorRef.current || typeof window === 'undefined') return undefined
+
+    const cursor = cursorRef.current
+    const mediaQuery = window.matchMedia('(pointer: fine)')
+
+    if (!mediaQuery.matches) {
+      cursor.style.display = 'none'
+      return undefined
+    }
+
+    const isInteractiveTarget = (target) => {
+      if (!(target instanceof Element)) return false
+      return target.closest('a, button, .activity-card, .fact, .site-nav > a, .icon-button')
+    }
+
+    const handlePointerMove = (event) => {
+      cursor.style.opacity = '1'
+      cursor.style.transform = `translate(${event.clientX}px, ${event.clientY}px) translate(-50%, -50%)`
+    }
+
+    const handlePointerLeave = () => {
+      cursor.style.opacity = '0'
+      cursor.classList.remove('custom-cursor--active')
+    }
+
+    const handlePointerOver = (event) => {
+      if (isInteractiveTarget(event.target)) {
+        cursor.classList.add('custom-cursor--active')
+      }
+    }
+
+    const handlePointerOut = (event) => {
+      const nextTarget = event.relatedTarget
+      if (!isInteractiveTarget(nextTarget)) {
+        cursor.classList.remove('custom-cursor--active')
+      }
+    }
+
+    document.addEventListener('pointermove', handlePointerMove)
+    document.addEventListener('pointerleave', handlePointerLeave)
+    document.addEventListener('pointerover', handlePointerOver)
+    document.addEventListener('pointerout', handlePointerOut)
+
+    return () => {
+      document.removeEventListener('pointermove', handlePointerMove)
+      document.removeEventListener('pointerleave', handlePointerLeave)
+      document.removeEventListener('pointerover', handlePointerOver)
+      document.removeEventListener('pointerout', handlePointerOut)
+    }
+  }, [])
+
   return (
     <>
+      <div className="custom-cursor" ref={cursorRef} aria-hidden="true" />
       <div className="reading-progress" aria-hidden="true"><span ref={progressRef} /></div>
       <div className="site-shell">
         <Header darkMode={darkMode} onThemeToggle={() => setDarkMode((value) => !value)} />
